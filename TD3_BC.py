@@ -140,7 +140,7 @@ class TD3_BC(object):
 			Q = self.critic.Q1(state, pi)
 			lmbda = self.alpha/Q.abs().mean().detach()
 
-			actor_loss = -lmbda * Q.mean() + F.mse_loss(pi, action) 
+			actor_loss = (-lmbda * Q + F.mse_loss(pi, action) * (reward +.9)).mean()
 			
 			# Optimize the actor 
 			self.actor_optimizer.zero_grad()
