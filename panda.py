@@ -25,6 +25,7 @@ class Reacher:
         self.prev_pos = ee_position
 
         obs = np.hstack([
+            data["achieved_goal"],
             ee_position, self.prev_pos.copy(), 
             ee_velocity,
             data["desired_goal"],
@@ -42,6 +43,7 @@ class Reacher:
         ee_velocity = obs[3:6]
 
         obs = np.hstack([
+            data[0]["achieved_goal"],
             ee_position, self.prev_pos.copy(), 
             ee_velocity,
             data[0]["desired_goal"],
@@ -81,6 +83,7 @@ class Pusher:
         self.prev_obj = ee_position
 
         obs = np.hstack([
+            data["achieved_goal"],
             ee_position, self.prev_pos.copy(), 
             ee_velocity,
 
@@ -106,6 +109,7 @@ class Pusher:
         object_angular_velocity = obs[15:]
 
         obs = np.hstack([
+            data[0]["achieved_goal"],
             ee_position, self.prev_pos.copy(), 
             ee_velocity,
 
