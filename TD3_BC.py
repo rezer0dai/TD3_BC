@@ -5,6 +5,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+from normalizer import Normalizer
+q_norm = Normalizer(1)
+a_norm = Normalizer(3)
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -138,9 +143,18 @@ class TD3_BC(object):
 			# Compute actor loss
 			pi = self.actor(state)
 			Q = self.critic.Q1(state, pi)
-			lmbda = self.alpha/Q.abs().mean().detach()
 
-			actor_loss = (-lmbda * Q + F.mse_loss(pi, action) * (reward +.9)).mean()
+#			lmbda = self.alpha/Q.abs().mean().detach()
+#			actor_loss = (-lmbda * Q + F.mse_loss(pi, action) * (reward +.9)).mean()
+
+#			print("Unormalized :", Q.mean(), (pi-action).pow(2).mean(0))
+			a_loss = (pi-action).pow(2)
+			with torch.no_grad(): q_norm.update(Q)
+			with torch.no_grad(): a_norm.update(a_loss)
+			Q = q_norm.normalize(Q)
+			a_loss = a_norm.normalize(a_loss)
+			actor_loss = (-self.alpha * Q + a_loss * (reward +.9)).mean()
+#			print("Nnormalized :", -self.alpha * Q.mean(), a_loss.mean(0))
 			
 			# Optimize the actor 
 			self.actor_optimizer.zero_grad()
