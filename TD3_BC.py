@@ -153,7 +153,7 @@ class TD3_BC(object):
 			with torch.no_grad(): a_norm.update(a_loss)
 			Q = q_norm.normalize(Q)
 			a_loss = a_norm.normalize(a_loss)
-			actor_loss = (-self.alpha * Q + a_loss * (reward +.9)).mean()
+			actor_loss = (-self.alpha * Q + a_loss).mean()
 #			print("Nnormalized :", -self.alpha * Q.mean(), a_loss.mean(0))
 			
 			# Optimize the actor 
