@@ -60,6 +60,9 @@ class Pusher:
         self.do_render = render
         self.action_space = self.env.action_space
 
+    def state_size(self):
+        return self.reset()["observation"].shape[-1]
+
     def render(self):
         if self.do_render:
             self.env.render()
@@ -90,6 +93,8 @@ class Pusher:
             object_rotation, object_velocity, object_angular_velocity, 
             object_position - ee_position, 
             object_position, self.prev_obj.copy(),
+
+            data["desired_goal"],
             ])
         data["observation"] = obs
         return data
@@ -116,6 +121,8 @@ class Pusher:
             object_rotation, object_velocity, object_angular_velocity, 
             object_position - ee_position, 
             object_position, self.prev_obj.copy(),
+            
+            data[0]["desired_goal"],
             ])
 
         self.prev_pos = ee_position
@@ -123,4 +130,5 @@ class Pusher:
 
         data[0]["observation"] = obs
         return data
+
 

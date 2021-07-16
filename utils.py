@@ -50,8 +50,13 @@ class ReplayBuffer(object):
 
 
 	def normalize_states(self, eps = 1e-3):
-		mean = self.state.mean(0,keepdims=True)
-		std = self.state.std(0,keepdims=True) + eps
-		self.state = (self.state - mean)/std
-		self.next_state = (self.next_state - mean)/std
-		return mean, std
+		mean1 = self.state[:, :-3].mean(0,keepdims=True)
+		std1 = self.state[:, :-3].std(0,keepdims=True) + eps
+		self.state[:, :-3] = (self.state[:, :-3] - mean1)/std1
+		self.next_state[:, :-3] = (self.next_state[:, :-3] - mean1)/std1
+
+		mean = self.state[:, -3:].mean(0,keepdims=True)
+		std = self.state[:, -3:].std(0,keepdims=True) + eps
+		self.state[:, -3:] = (self.state[:, -3:] - mean)/std
+		self.next_state[:, -3:] = (self.next_state[:, -3:] - mean)/std
+		return np.concatenate([mean1, mean], 1), np.concatenate([std1, std], 1)
