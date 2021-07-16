@@ -1,6 +1,10 @@
 import numpy as np
 import torch
 
+import config
+import state
+state_norm = state.GlobalNormalizerWithTime(config.STATE_SIZE)
+state_norm.share_memory()
 
 class ReplayBuffer(object):
 	def __init__(self, state_dim, action_dim, max_size=int(1e6)):
@@ -32,31 +36,20 @@ class ReplayBuffer(object):
 		ind = np.random.randint(0, self.size, size=batch_size)
 
 		return (
-			torch.FloatTensor(self.state[ind]).to(self.device),
+			self.normalize_state(self.state[ind]),
 			torch.FloatTensor(self.action[ind]).to(self.device),
-			torch.FloatTensor(self.next_state[ind]).to(self.device),
+			self.normalize_state(self.next_state[ind]),
 			torch.FloatTensor(self.reward[ind]).to(self.device),
 			torch.FloatTensor(self.not_done[ind]).to(self.device)
 		)
 
 
 	def convert_D4RL(self, dataset):
-		self.state = dataset['observations']
-		self.action = dataset['actions']
-		self.next_state = dataset['next_observations']
-		self.reward = dataset['rewards'].reshape(-1,1)
-		self.not_done = 1. - dataset['terminals'].reshape(-1,1)
-		self.size = self.state.shape[0]
+		assert False, "NOT IMPLEMENTED"
 
-
-	def normalize_states(self, eps = 1e-3):
-		mean1 = self.state[:, :-3].mean(0,keepdims=True)
-		std1 = self.state[:, :-3].std(0,keepdims=True) + eps
-		self.state[:, :-3] = (self.state[:, :-3] - mean1)/std1
-		self.next_state[:, :-3] = (self.next_state[:, :-3] - mean1)/std1
-
-		mean = self.state[:, -3:].mean(0,keepdims=True)
-		std = self.state[:, -3:].std(0,keepdims=True) + eps
-		self.state[:, -3:] = (self.state[:, -3:] - mean)/std
-		self.next_state[:, -3:] = (self.next_state[:, -3:] - mean)/std
-		return np.concatenate([mean1, mean], 1), np.concatenate([std1, std], 1)
+	def normalize_state(self, states):
+		if not config.NORMALIZE:
+			return states
+		goals = state.goal_norm(torch.from_numpy(states[:, -config.GOAL_SIZE:]).to(self.device).float())
+		states = state_norm(torch.from_numpy(states[:, :-config.GOAL_SIZE]).to(self.device).float())
+		return torch.cat([states, goals], 1)

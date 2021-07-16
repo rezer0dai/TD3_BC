@@ -24,3 +24,27 @@ UPDATE_EVERY = 50
 HER_PER_EP = 20
 HER_RATIO = 1.
 
+#DLPPOH
+TIMEFEAT = False#True#
+LEAK2LL = True#False#
+
+PANDA = "panda" in ENV
+ERGOJR = "ergojr" in ENV
+MUJOCO = not PANDA and not ERGOJR
+assert MUJOCO + PANDA + ERGOJR == 1
+
+BACKLASH = False
+PUSHER = "usher" in ENV
+
+GOAL_SIZE = 3
+
+PUSHER = False#True#
+
+if ERGOJR: # no gripper, velo per joint ( #of joints == action_size )
+    ACTION_SIZE = 3 + (not PUSHER) * 1#3
+    LL_STATE_SIZE = GOAL_SIZE * 2 + ACTION_SIZE * 2 + TIMEFEAT
+    STATE_SIZE = GOAL_SIZE + LL_STATE_SIZE + 3*GOAL_SIZE*PUSHER
+else: # arm pos, arm prev pos, arm velo, gripper pos + velo + velp
+    ACTION_SIZE = 3 + MUJOCO
+    LL_STATE_SIZE = GOAL_SIZE * 3 + 4 * MUJOCO + TIMEFEAT
+    STATE_SIZE = GOAL_SIZE + LL_STATE_SIZE + 6*GOAL_SIZE*PUSHER# velp + gripper, object velp for pusher
