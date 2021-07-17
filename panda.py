@@ -86,7 +86,7 @@ class Pusher:
         self.prev_obj = ee_position
 
         obs = np.hstack([
-            data["achieved_goal"],
+#            data["achieved_goal"],
             ee_position, self.prev_pos.copy(), 
             ee_velocity,
 
@@ -114,7 +114,7 @@ class Pusher:
         object_angular_velocity = obs[15:]
 
         obs = np.hstack([
-            data[0]["achieved_goal"],
+#            data[0]["achieved_goal"],
             ee_position, self.prev_pos.copy(), 
             ee_velocity,
 

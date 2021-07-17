@@ -33,6 +33,8 @@ class Normalizer(torch.nn.Module):
         self.synchronized = True
 
     def update(self, v):
+        if 1 == len(v):
+            return
         self.sum.data = self.sum.data + v.sum(0)
         self.sumsq.data = self.sumsq.data + (v ** 2).sum(0)
         self.count[0] = self.count[0] + v.shape[0]

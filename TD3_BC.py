@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+import config
 from normalizer import Normalizer
 q_norm = Normalizer(1)
 a_norm = Normalizer(3)
@@ -124,7 +125,10 @@ class TD3_BC(object):
 			# Compute the target Q value
 			target_Q1, target_Q2 = self.critic_target(next_state, next_action)
 			target_Q = torch.min(target_Q1, target_Q2)
-			target_Q = reward + not_done * self.discount * target_Q
+#			target_Q = reward + not_done * self.discount * target_Q
+			target_Q = reward + self.discount * target_Q
+			if config.CLIP_Q: target_Q = target_Q.clamp(-1. / (1.-self.discount), 0)
+                        
 
 		# Get current Q estimates
 		current_Q1, current_Q2 = self.critic(state, action)
@@ -144,30 +148,32 @@ class TD3_BC(object):
 			pi = self.actor(state)
 			Q = self.critic.Q1(state, pi)
 
+# ORIGINAL
 #			lmbda = self.alpha/Q.abs().mean().detach()
-#			actor_loss = (-lmbda * Q + F.mse_loss(pi, action) * (reward +.9)).mean()
+#			actor_loss = -Q.mean() * lmbda + F.mse_loss(pi, action)
 
-#			print("Unormalized :", Q.mean(), (pi-action).pow(2).mean(0))
 			a_loss = (pi-action).pow(2)
-			with torch.no_grad(): q_norm.update(Q)
-			with torch.no_grad(): a_norm.update(a_loss)
+			with torch.no_grad():
+				q_norm.update(Q)
+				a_norm.update(a_loss)
+
 			Q = q_norm.normalize(Q)
 			a_loss = a_norm.normalize(a_loss)
-			actor_loss = (-self.alpha * Q + a_loss).mean()
-#			print("Nnormalized :", -self.alpha * Q.mean(), a_loss.mean(0))
+
+			actor_loss = (-self.alpha * Q + a_loss).mean() + pi.pow(2).mean() * config.PIL2_GV
 			
 			# Optimize the actor 
 			self.actor_optimizer.zero_grad()
 			actor_loss.backward()
 			self.actor_optimizer.step()
 
-			# Update the frozen target models
-			for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-				target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+	def polyak(self):
+# Update the frozen target models
+		for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+			target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
-			for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-				target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-
+		for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+			target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
 	def save(self, filename):
 		torch.save(self.critic.state_dict(), filename + "_critic")

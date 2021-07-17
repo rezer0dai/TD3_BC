@@ -50,6 +50,4 @@ class ReplayBuffer(object):
 	def normalize_state(self, states):
 		if not config.NORMALIZE:
 			return states
-		goals = state.goal_norm(torch.from_numpy(states[:, -config.GOAL_SIZE:]).to(self.device).float())
-		states = state_norm(torch.from_numpy(states[:, :-config.GOAL_SIZE]).to(self.device).float())
-		return torch.cat([states, goals], 1)
+		return state_norm(torch.from_numpy(states).to(self.device).float())
