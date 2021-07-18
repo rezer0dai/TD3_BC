@@ -47,7 +47,8 @@ class ReplayBuffer(object):
 	def convert_D4RL(self, dataset):
 		assert False, "NOT IMPLEMENTED"
 
-	def normalize_state(self, states):
+	def normalize_state(self, states, update=False):
 		if not config.NORMALIZE:
 			return states
-		return state_norm(torch.from_numpy(states).to(self.device).float())
+		return state_norm(torch.from_numpy(states).to(self.device).float(), update)
+

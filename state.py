@@ -24,10 +24,10 @@ class RunningNorm(nn.Module):
     def active(self):
         return not self.stop
 
-    def forward(self, states):
+    def forward(self, states, update):
         shape = states.shape
         states = states.to(self.device()).view(-1, self.norm.size)
-        if not self.stop:
+        if update and not self.stop:
             self.norm.update(states)
         return self.norm.normalize(states).view(shape)
 
@@ -55,7 +55,7 @@ class GlobalNormalizerWithTime(nn.Module):
     def active(self):
         return self.enc.active()
 
-    def forward(self, states):
+    def forward(self, states, update):
         states = states.to(self.device())
 
         if config.TIMEFEAT:
@@ -63,7 +63,7 @@ class GlobalNormalizerWithTime(nn.Module):
             states = states[:, :-config.TIMEFEAT]
 
         #print("\n my device", self.device(), self.goal_encoder.device(), goal_norm.device())
-        enc = lambda data: self.goal_encoder(data).view(len(data), -1)
+        enc = lambda data: self.goal_encoder(data, update).view(len(data), -1)
         pos = lambda buf, b, e: buf[:, b*config.GOAL_SIZE:e*config.GOAL_SIZE]
 
         # goal, {current, previous} arm pos 
@@ -85,7 +85,7 @@ class GlobalNormalizerWithTime(nn.Module):
         if self.lowlevel and not config.LEAK2LL:
             state = states[:, config.GOAL_SIZE:][:, :config.LL_STATE_SIZE-config.TIMEFEAT]
 
-        encoded = self.enc(state)
+        encoded = self.enc(state, update)
 
         if self.lowlevel and not config.LEAK2LL:
             encoded = torch.cat([states[:, :config.GOAL_SIZE], encoded, states[:, config.GOAL_SIZE+config.LL_STATE_SIZE-config.TIMEFEAT:]], 1)
@@ -102,3 +102,4 @@ class GlobalNormalizerWithTime(nn.Module):
         if config.TIMEFEAT:
             encoded = torch.cat([encoded, tf], 1)
         return encoded
+
