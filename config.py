@@ -22,7 +22,7 @@ UPDATE_AFTER = 1000
 UPDATE_EVERY = 50*2
 UPDATE_COUNT = 40
 # HER
-HER_PER_EP = 20
+HER_PER_EP = 20 * 3
 HER_RATIO = 1.
 
 #DLPPOH
@@ -51,4 +51,5 @@ else: # arm pos, arm prev pos, arm velo, gripper pos + velo + velp
     ACTION_SIZE = 3 + MUJOCO
     LL_STATE_SIZE = GOAL_SIZE * 3 + 4 * MUJOCO + TIMEFEAT
     STATE_SIZE = GOAL_SIZE + LL_STATE_SIZE + 6*GOAL_SIZE*PUSHER# velp + gripper, object velp for pusher
+
 
