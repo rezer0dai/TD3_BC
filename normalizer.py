@@ -32,6 +32,7 @@ class Normalizer(torch.nn.Module):
 
         self.synchronized = True
 
+    @torch.no_grad()
     def update(self, v):
         if 1 == len(v):
             return
@@ -63,3 +64,4 @@ class Normalizer(torch.nn.Module):
             )
         )
         self.synchronized = True
+

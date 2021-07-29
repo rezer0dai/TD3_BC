@@ -11,6 +11,9 @@ q_norm = Normalizer(1)
 bc_norm = Normalizer(3)
 l2_norm = Normalizer(3)
 
+from state import RunningNorm
+adv_norm = RunningNorm(1)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -18,7 +21,7 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 256)
+        self.l1 = nn.Linear(state_dim - config.GOAL0_SIZE + config.GOAL1_SIZE, 256)
         self.l2 = nn.Linear(256, 256)
         self.l22 = nn.Linear(256, 256)
         self.l3 = nn.Linear(256, action_dim)
@@ -74,6 +77,15 @@ class Critic(nn.Module):
         q1 = self.l3(q1)
         return q1
 
+    def Q2(self, state, action):
+        sa = torch.cat([state, action], 1)
+
+        q2 = F.relu(self.l4(sa))
+        q2 = F.relu(self.l5(q2))
+        q2 = F.relu(self.l55(q2))
+        q2 = self.l6(q2)
+        return q2
+
 
 class TD3_BC(object):
     def __init__(
@@ -123,11 +135,11 @@ class TD3_BC(object):
         return action.clip(-1, 1)
 
 
-    def train_critic(self, replay_buffer, batch_size=256):
+    def train_critic(self, replay_buffer, get_goal, batch_size, use_norm, do_update):
         self.total_it += 1
 
         # Sample replay buffer 
-        state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
+        state, action, next_state, reward, discount, goal_, lp_, return_ = replay_buffer.sample(batch_size)
 
         with torch.no_grad():
             # Select action according to policy and add clipped noise
@@ -135,23 +147,40 @@ class TD3_BC(object):
                 torch.randn_like(action) * self.policy_noise
             ).clamp(-self.noise_clip, self.noise_clip)
             
+#            assert all((a-b).abs().sum() < 1e-5 for a,b in zip(
+#                    next_state[:, -config.GOAL0_SIZE:], get_goal(os)[:, -config.GOAL0_SIZE:])), "nope {} vs {}".format(
+#                    next_state[0, -config.GOAL0_SIZE:], get_goal(os)[0, -config.GOAL0_SIZE:]
+#                )
             next_action = (
-                self.actor_target(next_state) + noise
+                #self.actor_target(torch.cat([next_state[:, :-config.GOAL0_SIZE], goal], 1)) + noise
+                self.actor_target(torch.cat([next_state[:, :-config.GOAL0_SIZE], get_goal(next_state)], 1)) + noise
             ).clamp(-self.max_action, self.max_action)
 
             # Compute the target Q value
             target_Q1, target_Q2 = self.critic_target(next_state, next_action)
             target_Q = torch.min(target_Q1, target_Q2)
 #            target_Q = reward + not_done * self.discount * target_Q
-            target_Q = reward + self.discount * target_Q
+            target_Q = reward + discount * target_Q
             if config.CLIP_Q: target_Q = target_Q.clamp(-1. / (1.-self.discount), 0)
                         
 
         # Get current Q estimates
         current_Q1, current_Q2 = self.critic(state, action)
+#        critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
 
+        l1 = current_Q1 - target_Q
+        l2 = current_Q2 - target_Q
+
+        if do_update:
+            with torch.no_grad():
+                adv_norm(torch.cat([l1.detach(), l2.detach()]), update=True)
+            
+        if use_norm:
+            l1 = adv_norm(l1, update=False)
+            l2 = adv_norm(l2, update=False)
+
+        critic_loss = l1.pow(2).mean() + l2.pow(2).mean()
         # Compute critic loss
-        critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
 
         # Optimize the critic
         self.critic_optimizer.zero_grad()
@@ -160,28 +189,18 @@ class TD3_BC(object):
         
         return critic_loss.item()
 
-    def train_actor(self, replay_buffer, use_bc, batch_size=256):
+    def train_actor(self, replay_buffer, use_bc, get_goal, batch_size=256):
         # Delayed policy updates
         if self.total_it % self.policy_freq:
             return 0.
 
         # Sample replay buffer 
-        state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
+        #state, action, next_state, reward, not_done = replay_buffer.sample(batch_size)
+        state, action, next_state_, reward_, discount_, goal_, lp_, return_ = replay_buffer.sample(batch_size)
 
         # Compute actor loss
-        pi = self.actor(state)
+        pi = self.actor(torch.cat([ state[:, :-config.GOAL0_SIZE], get_goal(state) ], 1))
         Q = self.critic.Q1(state, pi)
-        out = """
-        bc = (pi-action).pow(2)
-
-        with torch.no_grad():
-            q_norm.update(Q)
-            bc_norm.update(bc)
-            l2_norm.update(pi)
-
-        Q = q_norm.normalize(Q)
-        bc = bc_norm.normalize(bc)
-        l2 = l2_norm.normalize(pi)"""
         
         lmbda = self.alpha/Q.abs().mean().detach()
         if use_bc:  actor_loss = -Q.mean() * lmbda + F.mse_loss(pi, action)
@@ -218,4 +237,5 @@ class TD3_BC(object):
         self.actor.load_state_dict(torch.load(filename + "_actor"))
         self.actor_optimizer.load_state_dict(torch.load(filename + "_actor_optimizer"))
         self.actor_target = copy.deepcopy(self.actor)
+
 
